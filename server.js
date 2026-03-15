@@ -1,5 +1,5 @@
 /**
- * 最小消息服务器 Demo
+ * Chat Server - 带后台管理界面
  * 使用: npm install express ws sqlite3 jsonwebtoken bcryptjs cors
  * 运行: node server.js
  */
@@ -11,32 +11,34 @@ const sqlite3 = require('sqlite3').verbose();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'admin123';
 
 // 中间件
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 数据库初始化
 const db = new sqlite3.Database('./messages.db');
 
 db.serialize(() => {
-  // 用户表
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE,
     password TEXT,
     nickname TEXT,
+    role TEXT DEFAULT 'user',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // 消息表
   db.run(`CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sender_id INTEGER,
@@ -49,7 +51,6 @@ db.serialize(() => {
     FOREIGN KEY(receiver_id) REFERENCES users(id)
   )`);
 
-  // 设备表
   db.run(`CREATE TABLE IF NOT EXISTS devices (
     id TEXT PRIMARY KEY,
     user_id INTEGER,
@@ -58,10 +59,15 @@ db.serialize(() => {
     last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id)
   )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )`);
 });
 
 // WebSocket 连接管理
-const clients = new Map(); // userId -> WebSocket
+const clients = new Map();
 
 wss.on('connection', (ws, req) => {
   let currentUserId = null;
@@ -71,7 +77,6 @@ wss.on('connection', (ws, req) => {
       const data = JSON.parse(message);
       
       if (data.type === 'auth') {
-        // 验证Token并绑定用户
         try {
           const decoded = jwt.verify(data.token, JWT_SECRET);
           currentUserId = decoded.userId;
@@ -87,13 +92,10 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    if (currentUserId) {
-      clients.delete(currentUserId);
-    }
+    if (currentUserId) clients.delete(currentUserId);
   });
 });
 
-// 广播消息给指定用户
 function sendToUser(userId, message) {
   const ws = clients.get(userId);
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -105,24 +107,67 @@ function sendToUser(userId, message) {
 
 // ============ API 路由 ============
 
-// 注册
-app.post('/api/auth/register', async (req, res) => {
-  const { username, password, nickname } = req.body;
+// 管理后台 - 登录
+app.post('/api/admin/login', (req, res) => {
+  const { secret } = req.body;
+  if (secret !== ADMIN_SECRET) {
+    return res.json({ success: false, error: 'Invalid secret' });
+  }
+  const token = jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '24h' });
+  res.json({ success: true, token });
+});
+
+// 管理中间件
+function authenticateAdmin(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.json({ success: false, error: 'Token required' });
   
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err || !user.admin) return res.json({ success: false, error: 'Invalid token' });
+    req.user = user;
+    next();
+  });
+}
+
+// 获取统计
+app.get('/api/admin/stats', authenticateAdmin, (req, res) => {
+  db.get('SELECT COUNT(*) as userCount FROM users', (err, r1) => {
+    db.get('SELECT COUNT(*) as messageCount FROM messages', (err, r2) => {
+      db.get('SELECT COUNT(*) as onlineCount FROM devices WHERE datetime(last_active) > datetime("now", "-5 minutes")', (err, r3) => {
+        res.json({ 
+          success: true, 
+          stats: {
+            users: r1.userCount,
+            messages: r2.messageCount,
+            online: r3.onlineCount
+          }
+        });
+      });
+    });
+  });
+});
+
+// 获取所有用户
+app.get('/api/admin/users', authenticateAdmin, (req, res) => {
+  db.all('SELECT id, username, nickname, role, created_at FROM users ORDER BY id', (err, users) => {
+    res.json({ success: true, users });
+  });
+});
+
+// 创建用户
+app.post('/api/admin/users', authenticateAdmin, async (req, res) => {
+  const { username, password, nickname, role = 'user' } = req.body;
   if (!username || !password) {
     return res.json({ success: false, error: 'Username and password required' });
   }
-
+  
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-    
-    db.run(
-      'INSERT INTO users (username, password, nickname) VALUES (?, ?, ?)',
-      [username, hashedPassword, nickname || username],
+    db.run('INSERT INTO users (username, password, nickname, role) VALUES (?, ?, ?, ?)',
+      [username, hashedPassword, nickname || username, role],
       function(err) {
-        if (err) {
-          return res.json({ success: false, error: 'Username already exists' });
-        }
+        if (err) return res.json({ success: false, error: 'Username exists' });
         res.json({ success: true, userId: this.lastID });
       }
     );
@@ -131,22 +176,83 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// 登录
+// 删除用户
+app.delete('/api/admin/users/:id', authenticateAdmin, (req, res) => {
+  db.run('DELETE FROM users WHERE id = ? AND role != "admin"', [req.params.id], function(err) {
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
+// 获取所有消息
+app.get('/api/admin/messages', authenticateAdmin, (req, res) => {
+  const { limit = 50, offset = 0 } = req.query;
+  db.all(`
+    SELECT m.*, s.username as sender_username, r.username as receiver_username
+    FROM messages m
+    LEFT JOIN users s ON m.sender_id = s.id
+    LEFT JOIN users r ON m.receiver_id = r.id
+    ORDER BY m.created_at DESC LIMIT ? OFFSET ?
+  `, [limit, offset], (err, messages) => {
+    res.json({ success: true, messages: messages.reverse() });
+  });
+});
+
+// 删除消息
+app.delete('/api/admin/messages/:id', authenticateAdmin, (req, res) => {
+  db.run('DELETE FROM messages WHERE id = ?', [req.params.id], function(err) {
+    res.json({ success: true, deleted: this.changes });
+  });
+});
+
+// 获取设置
+app.get('/api/admin/settings', authenticateAdmin, (req, res) => {
+  db.all('SELECT * FROM settings', (err, settings) => {
+    const obj = {};
+    settings.forEach(s => obj[s.key] = s.value);
+    res.json({ success: true, settings: obj });
+  });
+});
+
+// 保存设置
+app.post('/api/admin/settings', authenticateAdmin, (req, res) => {
+  const { key, value } = req.body;
+  db.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value], function(err) {
+    res.json({ success: true });
+  });
+});
+
+// ============ 用户API ============
+
+app.post('/api/auth/register', async (req, res) => {
+  const { username, password, nickname } = req.body;
+  if (!username || !password) {
+    return res.json({ success: false, error: 'Username and password required' });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    db.run('INSERT INTO users (username, password, nickname) VALUES (?, ?, ?)',
+      [username, hashedPassword, nickname || username],
+      function(err) {
+        if (err) return res.json({ success: false, error: 'Username exists' });
+        res.json({ success: true, userId: this.lastID });
+      }
+    );
+  } catch (e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body;
   
   db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
-    if (err || !user) {
-      return res.json({ success: false, error: 'User not found' });
-    }
+    if (err || !user) return res.json({ success: false, error: 'User not found' });
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) {
-      return res.json({ success: false, error: 'Invalid password' });
-    }
+    if (!valid) return res.json({ success: false, error: 'Invalid password' });
 
     const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET, { expiresIn: '7d' });
-    
     res.json({ 
       success: true, 
       token, 
@@ -155,31 +261,23 @@ app.post('/api/auth/login', (req, res) => {
   });
 });
 
-// 获取用户资料
 app.get('/api/auth/profile', authenticateToken, (req, res) => {
   db.get('SELECT id, username, nickname, created_at FROM users WHERE id = ?', [req.user.userId], (err, user) => {
-    if (err || !user) {
-      return res.json({ success: false, error: 'User not found' });
-    }
+    if (err || !user) return res.json({ success: false, error: 'User not found' });
     res.json({ success: true, user });
   });
 });
 
-// 发送消息
 app.post('/api/messages/send', authenticateToken, (req, res) => {
   const { receiver_id, content, type = 'text' } = req.body;
-  
   if (!receiver_id || !content) {
     return res.json({ success: false, error: 'receiver_id and content required' });
   }
 
-  db.run(
-    'INSERT INTO messages (sender_id, receiver_id, content, type) VALUES (?, ?, ?, ?)',
+  db.run('INSERT INTO messages (sender_id, receiver_id, content, type) VALUES (?, ?, ?, ?)',
     [req.user.userId, receiver_id, content, type],
     function(err) {
-      if (err) {
-        return res.json({ success: false, error: err.message });
-      }
+      if (err) return res.json({ success: false, error: err.message });
 
       const message = {
         id: this.lastID,
@@ -191,15 +289,12 @@ app.post('/api/messages/send', authenticateToken, (req, res) => {
         created_at: new Date().toISOString()
       };
 
-      // WebSocket推送
       sendToUser(receiver_id, { type: 'message', data: message });
-
       res.json({ success: true, message });
     }
   );
 });
 
-// 获取消息列表
 app.get('/api/messages', authenticateToken, (req, res) => {
   const { other_id, limit = 50, offset = 0 } = req.query;
   
@@ -208,85 +303,36 @@ app.get('/api/messages', authenticateToken, (req, res) => {
     FROM messages m
     LEFT JOIN users u ON m.sender_id = u.id
     WHERE (m.sender_id = ? AND m.receiver_id = ?) OR (m.sender_id = ? AND m.receiver_id = ?)
-    ORDER BY m.created_at DESC
-    LIMIT ? OFFSET ?
+    ORDER BY m.created_at DESC LIMIT ? OFFSET ?
   `;
 
   db.all(sql, [req.user.userId, other_id, other_id, req.user.userId, limit, offset], (err, messages) => {
-    if (err) {
-      return res.json({ success: false, error: err.message });
-    }
+    if (err) return res.json({ success: false, error: err.message });
     res.json({ success: true, messages: messages.reverse() });
   });
 });
 
-// 获取用户列表
 app.get('/api/users', authenticateToken, (req, res) => {
   db.all('SELECT id, username, nickname FROM users WHERE id != ?', [req.user.userId], (err, users) => {
-    if (err) {
-      return res.json({ success: false, error: err.message });
-    }
+    if (err) return res.json({ success: false, error: err.message });
     res.json({ success: true, users });
   });
 });
 
-// OpenClaw 回调 - 收到消息后推送给APP
-app.post('/api/openclaw/webhook', (req, res) => {
-  const { user_id, content, from } = req.body;
-  
-  // 存储消息
-  db.run(
-    'INSERT INTO messages (sender_id, receiver_id, content, type) VALUES (?, ?, ?, ?)',
-    [0, user_id, content, 'text'],
-    function(err) {
-      if (!err) {
-        // 推送给APP
-        sendToUser(user_id, { 
-          type: 'message', 
-          data: {
-            id: this.lastID,
-            sender_id: 0,
-            sender_username: 'openclaw',
-            content,
-            created_at: new Date().toISOString()
-          }
-        });
-      }
-    }
-  );
-
-  res.json({ success: true });
-});
-
-// OpenClaw 发送消息
-app.post('/api/openclaw/send', authenticateToken, (req, res) => {
-  const { content } = req.body;
-  
-  // 这里可以调用OpenClaw的API发送消息
-  // 暂时只返回成功
-  res.json({ success: true, message: 'Message queued' });
-});
-
-// 中间件：验证Token
 function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.json({ success: false, error: 'Token required' });
-  }
+  if (!token) return res.json({ success: false, error: 'Token required' });
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.json({ success: false, error: 'Invalid token' });
-    }
+    if (err) return res.json({ success: false, error: 'Invalid token' });
     req.user = user;
     next();
   });
 }
 
-// 启动服务器
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`WebSocket running on ws://localhost:${PORT}`);
+  console.log(`Admin: http://localhost:${PORT}/admin`);
+  console.log(`WebSocket: ws://localhost:${PORT}`);
 });

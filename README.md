@@ -8,6 +8,7 @@
 - 消息收发 (REST API + WebSocket实时推送)
 - SQLite本地存储
 - OpenClaw集成 (Webhook回调)
+- **管理后台** (`/admin`) - 用户管理、消息管理、系统设置
 
 ## 快速部署
 

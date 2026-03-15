@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Server 管理后台</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+    .login-page { display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 360px; }
+    .login-box h1 { text-align: center; margin-bottom: 24px; color: #333; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; color: #666; font-size: 14px; }
+    .form-group input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+    .form-group input:focus { outline: none; border-color: #007AFF; }
+    .btn { width: 100%; padding: 12px; background: #007AFF; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    .btn:hover { background: #0056b3; }
+    .error { color: #ff3b30; font-size: 14px; text-align: center; margin-top: 12px; }
+    
+    .admin-page { display: none; }
+    .header { background: white; padding: 16px 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 20px; color: #333; }
+    .header .logout { color: #666; cursor: pointer; font-size: 14px; }
+    .container { max-width: 1200px; margin: 24px auto; padding: 0 24px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: white; padding: 24px; border-radius: 12px; text-align: center; }
+    .stat-card .number { font-size: 36px; font-weight: bold; color: #007AFF; }
+    .stat-card .label { color: #666; margin-top: 8px; }
+    .card { background: white; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .card h2 { font-size: 18px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .card-header h2 { margin: 0; padding: 0; border: none; }
+    .btn-sm { padding: 8px 16px; font-size: 14px; width: auto; }
+    .btn-danger { background: #ff3b30; }
+    .btn-danger:hover { background: #d32f2f; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+    th { color: #666; font-weight: 500; font-size: 14px; }
+    td { font-size: 14px; }
+    .empty { text-align: center; color: #999; padding: 40px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tab { padding: 10px 20px; background: #f5f5f5; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .tab.active { background: #007AFF; color: white; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+    .modal.show { display: flex; }
+    .modal-content { background: white; padding: 24px; border-radius: 12px; width: 400px; }
+    .modal-content h3 { margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 12px; margin-top: 20px; }
+    .modal-actions .btn { width: auto; flex: 1; }
+    .modal-actions .btn-secondary { background: #8e8e93; }
+  </style>
+</head>
+<body>
+  <!-- 登录页面 -->
+  <div class="login-page" id="loginPage">
+    <div class="login-box">
+      <h1>🔧 管理后台</h1>
+      <div class="form-group">
+        <label>管理密钥</label>
+        <input type="password" id="adminSecret" placeholder="请输入管理密钥">
+      </div>
+      <button class="btn" onclick="login()">登录</button>
+      <div class="error" id="loginError"></div>
+    </div>
+  </div>
+
+  <!-- 管理后台 -->
+  <div class="admin-page" id="adminPage">
+    <div class="header">
+      <h1>📱 Chat Server 管理后台</h1>
+      <span class="logout" onclick="logout()">退出登录</span>
+    </div>
+    <div class="container">
+      <div class="stats">
+        <div class="stat-card">
+          <div class="number" id="userCount">-</div>
+          <div class="label">👥 用户数</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="messageCount">-</div>
+          <div class="label">💬 消息数</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="onlineCount">-</div>
+          <div class="label">🟢 在线设备</div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" onclick="showTab('users')">👥 用户管理</button>
+        <button class="tab" onclick="showTab('messages')">💬 消息管理</button>
+        <button class="tab" onclick="showTab('settings')">⚙️ 系统设置</button>
+      </div>
+
+      <!-- 用户管理 -->
+      <div class="tab-content active" id="usersTab">
+        <div class="card">
+          <div class="card-header">
+            <h2>用户列表</h2>
+            <button class="btn btn-sm" onclick="showAddUserModal()">+ 添加用户</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>昵称</th>
+                <th>角色</th>
+                <th>注册时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="userTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 消息管理 -->
+      <div class="tab-content" id="messagesTab">
+        <div class="card">
+          <div class="card-header">
+            <h2>消息列表</h2>
+            <button class="btn btn-sm" onclick="loadMessages()">🔄 刷新</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>发送者</th>
+                <th>接收者</th>
+                <th>内容</th>
+                <th>时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="messageTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 系统设置 -->
+      <div class="tab-content" id="settingsTab">
+        <div class="card">
+          <h2>系统设置</h2>
+          <div class="form-group">
+            <label>JWT 密钥</label>
+            <input type="text" id="jwtSecret" placeholder="请输入JWT密钥">
+          </div>
+          <div class="form-group">
+            <label>管理密钥</label>
+            <input type="text" id="adminSecretSetting" placeholder="请输入管理密钥">
+          </div>
+          <button class="btn" onclick="saveSettings()">保存设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加用户弹窗 -->
+  <div class="modal" id="addUserModal">
+    <div class="modal-content">
+      <h3>添加用户</h3>
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="newUsername">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="newPassword">
+      </div>
+      <div class="form-group">
+        <label>昵称</label>
+        <input type="text" id="newNickname">
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+        <button class="btn" onclick="addUser()">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let token = localStorage.getItem('adminToken');
+
+    // 检查登录状态
+    if (token) {
+      showAdmin();
+    }
+
+    async function login() {
+      const secret = document.getElementById('adminSecret').value;
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret })
+      });
+      const data = await res.json();
+      if (data.success) {
+        token = data.token;
+        localStorage.setItem('adminToken', token);
+        showAdmin();
+      } else {
+        document.getElementById('loginError').textContent = data.error;
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('adminToken');
+      location.reload();
+    }
+
+    function showAdmin() {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('adminPage').style.display = 'block';
+      loadStats();
+      loadUsers();
+      loadMessages();
+    }
+
+    async function loadStats() {
+      const res = await fetch('/api/admin/stats', { headers: { 'Authorization': 'Bearer ' + token } });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('userCount').textContent = data.stats.users;
+        document.getElementById('messageCount').textContent = data.stats.messages;
+        document.getElementById('onlineCount').textContent = data.stats.online;
+      }
+    }
+
+    async function loadUsers() {
+      const res = await fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } });
+      const data = await res.json();
+      if (data.success) {
+        const tbody = document.getElementById('userTable');
+        if (data.users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">暂无用户</td></tr>';
+        } else {
+          tbody.innerHTML = data.users.map(u => `
+            <tr>
+              <td>${u.id}</td>
+              <td>${u.username}</td>
+              <td>${u.nickname || '-'}</td>
+              <td>${u.role}</td>
+              <td>${new Date(u.created_at).toLocaleString()}</td>
+              <td>
+                ${u.role !== 'admin' ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">删除</button>` : '-'}
+              </td>
+            </tr>
+          `).join('');
+        }
+      }
+    }
+
+    async function loadMessages() {
+      const res = await fetch('/api/admin/messages?limit=100', { headers: { 'Authorization': 'Bearer ' + token } });
+      const data = await res.json();
+      if (data.success) {
+        const tbody = document.getElementById('messageTable');
+        if (data.messages.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="empty">暂无消息</td></tr>';
+        } else {
+          tbody.innerHTML = data.messages.map(m => `
+            <tr>
+              <td>${m.id}</td>
+              <td>${m.sender_username || '系统'}</td>
+              <td>${m.receiver_username || '系统'}</td>
+              <td>${m.content.substring(0, 50)}${m.content.length > 50 ? '...' : ''}</td>
+              <td>${new Date(m.created_at).toLocaleString()}</td>
+              <td><button class="btn btn-sm btn-danger" onclick="deleteMessage(${m.id})">删除</button></td>
+            </tr>
+          `).join('');
+        }
+      }
+    }
+
+    async function deleteUser(id) {
+      if (!confirm('确定删除此用户？')) return;
+      const res = await fetch('/api/admin/users/' + id, { 
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      loadUsers();
+      loadStats();
+    }
+
+    async function deleteMessage(id) {
+      if (!confirm('确定删除此消息？')) return;
+      const res = await fetch('/api/admin/messages/' + id, { 
+        method: 'DELETE',
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      loadMessages();
+      loadStats();
+    }
+
+    async function saveSettings() {
+      const jwtSecret = document.getElementById('jwtSecret').value;
+      const adminSecret = document.getElementById('adminSecretSetting').value;
+      if (jwtSecret) {
+        await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ key: 'jwt_secret', value: jwtSecret })
+        });
+      }
+      if (adminSecret) {
+        await fetch('/api/admin/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ key: 'admin_secret', value: adminSecret })
+        });
+      }
+      alert('设置已保存');
+    }
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById(tab + 'Tab').classList.add('active');
+    }
+
+    function showAddUserModal() {
+      document.getElementById('addUserModal').classList.add('show');
+    }
+
+    function closeModal() {
+      document.getElementById('addUserModal').classList.remove('show');
+    }
+
+    async function addUser() {
+      const username = document.getElementById('newUsername').value;
+      const password = document.getElementById('newPassword').value;
+      const nickname = document.getElementById('newNickname').value;
+      
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ username, password, nickname })
+      });
+      const data = await res.json();
+      if (data.success) {
+        closeModal();
+        loadUsers();
+        loadStats();
+      } else {
+        alert(data.error);
+      }
+    }
+  </script>
+</body>
+</html>
