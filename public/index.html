@@ -8,7 +8,6 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; height: 100vh; overflow: hidden; }
     
-    /* 登录页面 */
     .login-page { display: flex; justify-content: center; align-items: center; height: 100vh; }
     .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); width: 360px; }
     .login-box h1 { text-align: center; margin-bottom: 24px; color: #333; }
@@ -25,13 +24,10 @@
     .btn-secondary:hover { background: #6c6c70; }
     .error { color: #ff3b30; font-size: 14px; text-align: center; margin-top: 12px; }
     
-    /* 主界面 */
     .chat-page { display: none; height: 100vh; }
     .sidebar { width: 280px; background: white; border-right: 1px solid #eee; display: flex; flex-direction: column; }
     .sidebar-header { padding: 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
     .sidebar-header h2 { font-size: 18px; }
-    .user-info { display: flex; align-items: center; gap: 10px; }
-    .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: #007AFF; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
     .user-list { flex: 1; overflow-y: auto; }
     .user-item { padding: 12px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #f5f5f5; }
     .user-item:hover { background: #f5f5f5; }
@@ -40,9 +36,7 @@
     .user-item .info { flex: 1; }
     .user-item .name { font-weight: 500; }
     .user-item .last-msg { color: #999; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-    .user-item .badge { background: #ff3b30; color: white; padding: 2px 6px; border-radius: 10px; font-size: 11px; }
     
-    /* 聊天区域 */
     .chat-area { flex: 1; display: flex; flex-direction: column; }
     .chat-header { padding: 16px; background: white; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 12px; }
     .chat-header .avatar { width: 40px; height: 40px; border-radius: 50%; background: #34C759; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold; }
@@ -54,29 +48,23 @@
     .message.sent .avatar { background: #34C759; }
     .message .bubble { max-width: 70%; padding: 10px 14px; border-radius: 18px; background: white; }
     .message.sent .bubble { background: #007AFF; color: white; }
+    .message .bubble img { max-width: 200px; border-radius: 8px; margin-top: 4px; }
     .message .time { font-size: 11px; color: #999; margin-top: 4px; }
-    .message.sent .time { text-align: right; }
-    .message.sent .time { color: rgba(255,255,255,0.7); }
+    .message.sent .time { text-align: right; color: rgba(255,255,255,0.7); }
     
-    .chat-input { padding: 16px; background: white; border-top: 1px solid #eee; display: flex; gap: 12px; }
+    .chat-input { padding: 16px; background: white; border-top: 1px solid #eee; display: flex; gap: 12px; align-items: center; }
     .chat-input input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 24px; outline: none; }
     .chat-input input:focus { border-color: #007AFF; }
     .chat-input .send-btn { width: 44px; height: 44px; border-radius: 50%; background: #007AFF; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .chat-input .send-btn:hover { background: #0056b3; }
+    .chat-input .img-btn { width: 44px; height: 44px; border-radius: 50%; background: #34C759; color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     
     .empty-chat { flex: 1; display: flex; align-items: center; justify-content: center; color: #999; }
-    
-    /* 设置页面 */
-    .settings-page { display: none; padding: 24px; background: white; }
-    .settings-page h2 { margin-bottom: 20px; }
-    .settings-page .section { margin-bottom: 24px; }
-    .settings-page .section h3 { margin-bottom: 12px; color: #333; }
-    
     .logout { color: #ff3b30; cursor: pointer; font-size: 14px; }
+    #imagePreview { display: none; max-width: 100px; max-height: 100px; border-radius: 8px; margin-right: 8px; }
   </style>
 </head>
 <body>
-  <!-- 登录页面 -->
   <div class="login-page" id="loginPage">
     <div class="login-box">
       <h1>💬 Chat</h1>
@@ -84,40 +72,21 @@
         <div class="tab active" onclick="showLoginTab('login')">登录</div>
         <div class="tab" onclick="showLoginTab('register')">注册</div>
       </div>
-      
       <div id="loginForm">
-        <div class="form-group">
-          <label>用户名</label>
-          <input type="text" id="loginUsername" placeholder="请输入用户名">
-        </div>
-        <div class="form-group">
-          <label>密码</label>
-          <input type="password" id="loginPassword" placeholder="请输入密码">
-        </div>
+        <div class="form-group"><input type="text" id="loginUsername" placeholder="用户名"></div>
+        <div class="form-group"><input type="password" id="loginPassword" placeholder="密码"></div>
         <button class="btn" onclick="login()">登录</button>
       </div>
-      
       <div id="registerForm" style="display:none">
-        <div class="form-group">
-          <label>用户名</label>
-          <input type="text" id="regUsername" placeholder="请输入用户名">
-        </div>
-        <div class="form-group">
-          <label>昵称</label>
-          <input type="text" id="regNickname" placeholder="请输入昵称">
-        </div>
-        <div class="form-group">
-          <label>密码</label>
-          <input type="password" id="regPassword" placeholder="请输入密码">
-        </div>
+        <div class="form-group"><input type="text" id="regUsername" placeholder="用户名"></div>
+        <div class="form-group"><input type="text" id="regNickname" placeholder="昵称"></div>
+        <div class="form-group"><input type="password" id="regPassword" placeholder="密码"></div>
         <button class="btn" onclick="register()">注册</button>
       </div>
-      
       <div class="error" id="loginError"></div>
     </div>
   </div>
 
-  <!-- 聊天页面 -->
   <div class="chat-page" id="chatPage">
     <div class="sidebar">
       <div class="sidebar-header">
@@ -139,120 +108,77 @@
     let users = [];
     let messagesCache = {};
 
-    // 检查登录状态
-    if (token) {
-      checkAuth();
-    }
+    if (token) checkAuth();
 
     function showLoginTab(tab) {
       document.querySelectorAll('.login-box .tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
-      if (tab === 'login') {
-        document.getElementById('loginForm').style.display = 'block';
-        document.getElementById('registerForm').style.display = 'none';
-      } else {
-        document.getElementById('loginForm').style.display = 'none';
-        document.getElementById('registerForm').style.display = 'block';
-      }
+      document.getElementById('loginForm').style.display = tab === 'login' ? 'block' : 'none';
+      document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
     }
 
     async function login() {
-      const username = document.getElementById('loginUsername').value;
-      const password = document.getElementById('loginPassword').value;
-      
       const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: document.getElementById('loginUsername').value, password: document.getElementById('loginPassword').value })
       });
       const data = await res.json();
       if (data.success) {
-        token = data.token;
-        currentUser = data.user;
+        token = data.token; currentUser = data.user;
         localStorage.setItem('chatToken', token);
         localStorage.setItem('chatUser', JSON.stringify(data.user));
         showChat();
-      } else {
-        document.getElementById('loginError').textContent = data.error;
-      }
+      } else { document.getElementById('loginError').textContent = data.error; }
     }
 
     async function register() {
-      const username = document.getElementById('regUsername').value;
-      const nickname = document.getElementById('regNickname').value;
-      const password = document.getElementById('regPassword').value;
-      
       const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, nickname, password })
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: document.getElementById('regUsername').value, 
+          nickname: document.getElementById('regNickname').value,
+          password: document.getElementById('regPassword').value 
+        })
       });
       const data = await res.json();
-      if (data.success) {
-        showLoginTab('login');
-        document.getElementById('loginError').textContent = '注册成功，请登录';
-      } else {
-        document.getElementById('loginError').textContent = data.error;
-      }
+      if (data.success) { showLoginTab('login'); document.getElementById('loginError').textContent = '注册成功，请登录'; }
+      else { document.getElementById('loginError').textContent = data.error; }
     }
 
-    function logout() {
-      localStorage.removeItem('chatToken');
-      localStorage.removeItem('chatUser');
-      location.reload();
-    }
+    function logout() { localStorage.removeItem('chatToken'); localStorage.removeItem('chatUser'); location.reload(); }
 
     async function checkAuth() {
-      const res = await fetch('/api/auth/profile', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
+      const res = await fetch('/api/auth/profile', { headers: { 'Authorization': 'Bearer ' + token } });
       const data = await res.json();
-      if (data.success) {
-        currentUser = data.user;
-        showChat();
-      } else {
-        logout();
-      }
+      if (data.success) { currentUser = data.user; showChat(); } else { logout(); }
     }
 
     function showChat() {
       document.getElementById('loginPage').style.display = 'none';
       document.getElementById('chatPage').style.display = 'flex';
       currentUser = JSON.parse(localStorage.getItem('chatUser'));
-      loadUsers();
-      connectWebSocket();
+      loadUsers(); connectWebSocket();
     }
 
     function connectWebSocket() {
       ws = new WebSocket('ws://' + location.host);
-      
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'auth', token: token }));
-      };
-      
+      ws.onopen = () => ws.send(JSON.stringify({ type: 'auth', token: token }));
       ws.onmessage = (e) => {
         const data = JSON.parse(e.data);
         if (data.type === 'message') {
           const msg = data.data;
           if (!messagesCache[msg.sender_id]) messagesCache[msg.sender_id] = [];
           messagesCache[msg.sender_id].push(msg);
-          if (currentChatUser && msg.sender_id === currentChatUser.id) {
-            renderMessages(currentChatUser.id);
-          }
+          if (currentChatUser && msg.sender_id === currentChatUser.id) renderMessages(currentChatUser.id);
           updateUserList();
         }
       };
     }
 
     async function loadUsers() {
-      const res = await fetch('/api/users', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      });
+      const res = await fetch('/api/users', { headers: { 'Authorization': 'Bearer ' + token } });
       const data = await res.json();
-      if (data.success) {
-        users = data.users;
-        renderUserList();
-      }
+      if (data.success) { users = data.users; renderUserList(); }
     }
 
     function renderUserList() {
@@ -261,39 +187,21 @@
         const msgs = messagesCache[u.id] || [];
         const lastMsg = msgs[msgs.length - 1];
         const initial = (u.nickname || u.username).charAt(0).toUpperCase();
-        return `
-          <div class="user-item" onclick="selectUser(${u.id})">
-            <div class="avatar">${initial}</div>
-            <div class="info">
-              <div class="name">${u.nickname || u.username}</div>
-              <div class="last-msg">${lastMsg ? lastMsg.content.substring(0, 20) : '暂无消息'}</div>
-            </div>
-          </div>
-        `;
+        return `<div class="user-item" onclick="selectUser(${u.id})"><div class="avatar">${initial}</div><div class="info"><div class="name">${u.nickname || u.username}</div><div class="last-msg">${lastMsg ? (lastMsg.content || '[图片]').substring(0, 20) : '暂无消息'}</div></div></div>`;
       }).join('');
     }
 
-    function updateUserList() {
-      renderUserList();
-    }
+    function updateUserList() { renderUserList(); }
 
     async function selectUser(userId) {
       currentChatUser = users.find(u => u.id === userId);
-      
       document.querySelectorAll('.user-item').forEach(el => el.classList.remove('active'));
       event.currentTarget.classList.add('active');
-      
-      // 加载消息
       if (!messagesCache[userId]) {
-        const res = await fetch('/api/messages?other_id=' + userId, {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
+        const res = await fetch('/api/messages?other_id=' + userId, { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
-        if (data.success) {
-          messagesCache[userId] = data.messages;
-        }
+        if (data.success) messagesCache[userId] = data.messages;
       }
-      
       renderChatArea();
     }
 
@@ -301,63 +209,61 @@
       const area = document.getElementById('chatArea');
       const msgs = messagesCache[currentChatUser.id] || [];
       const initial = (currentChatUser.nickname || currentChatUser.username).charAt(0).toUpperCase();
-      
       area.innerHTML = `
-        <div class="chat-header">
-          <div class="avatar">${initial}</div>
-          <div class="name">${currentChatUser.nickname || currentChatUser.username}</div>
-        </div>
-        <div class="chat-messages" id="chatMessages">
-          ${msgs.map(m => renderMessage(m)).join('')}
-        </div>
+        <div class="chat-header"><div class="avatar">${initial}</div><div class="name">${currentChatUser.nickname || currentChatUser.username}</div></div>
+        <div class="chat-messages" id="chatMessages">${msgs.map(m => renderMessage(m)).join('')}</div>
         <div class="chat-input">
-          <input type="text" id="messageInput" placeholder="输入消息..." onkeypress="handleKeypress(event)">
+          <img id="imagePreview"><input type="text" id="messageInput" placeholder="输入消息..." onkeypress="handleKeypress(event)">
+          <button class="img-btn" onclick="document.getElementById('imageInput').click()">🖼️</button>
+          <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
           <button class="send-btn" onclick="sendMessage()">➤</button>
-        </div>
-      `;
-      
-      // 滚动到底部
-      setTimeout(() => {
-        const container = document.getElementById('chatMessages');
-        container.scrollTop = container.scrollHeight;
-      }, 0);
+        </div>`;
+      setTimeout(() => { document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight; }, 0);
     }
 
     function renderMessage(m) {
       const isSent = m.sender_id === currentUser.id;
       const initial = isSent ? (currentUser.nickname || currentUser.username).charAt(0).toUpperCase() : (currentChatUser.nickname || currentChatUser.username).charAt(0).toUpperCase();
       const time = new Date(m.created_at).toLocaleTimeString();
-      
-      return `
-        <div class="message ${isSent ? 'sent' : ''}">
-          <div class="avatar">${initial}</div>
-          <div class="bubble">
-            <div>${escapeHtml(m.content)}</div>
-            <div class="time">${time}</div>
-          </div>
-        </div>
-      `;
+      const imgHtml = m.image_url ? `<img src="${m.image_url}">` : '';
+      return `<div class="message ${isSent ? 'sent' : ''}"><div class="avatar">${initial}</div><div class="bubble"><div>${escapeHtml(m.content)}</div>${imgHtml}<div class="time">${time}</div></div></div>`;
     }
 
     function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+      if (!text) return '';
+      const div = document.createElement('div'); div.textContent = text; return div.innerHTML;
+    }
+
+    let selectedImageUrl = null;
+
+    function handleImageSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        selectedImageUrl = ev.target.result;
+        document.getElementById('imagePreview').src = selectedImageUrl;
+        document.getElementById('imagePreview').style.display = 'block';
+      };
+      reader.readAsDataURL(file);
     }
 
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const content = input.value.trim();
-      if (!content || !currentChatUser) return;
+      if (!content && !selectedImageUrl) return;
       
       const res = await fetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ receiver_id: currentChatUser.id, content })
+        body: JSON.stringify({ receiver_id: currentChatUser.id, content, image_url: selectedImageUrl })
       });
       const data = await res.json();
       if (data.success) {
         input.value = '';
+        selectedImageUrl = null;
+        document.getElementById('imagePreview').style.display = 'none';
+        document.getElementById('imageInput').value = '';
         if (!messagesCache[currentChatUser.id]) messagesCache[currentChatUser.id] = [];
         messagesCache[currentChatUser.id].push(data.message);
         renderMessages(currentChatUser.id);
@@ -368,16 +274,11 @@
     function renderMessages(userId) {
       const container = document.getElementById('chatMessages');
       if (!container) return;
-      const msgs = messagesCache[userId] || [];
-      container.innerHTML = msgs.map(m => renderMessage(m)).join('');
+      container.innerHTML = (messagesCache[userId] || []).map(m => renderMessage(m)).join('');
       container.scrollTop = container.scrollHeight;
     }
 
-    function handleKeypress(e) {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
-    }
+    function handleKeypress(e) { if (e.key === 'Enter') sendMessage(); }
   </script>
 </body>
 </html>
