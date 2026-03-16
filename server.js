@@ -1,6 +1,7 @@
 /**
- * Chat Server - 完整版
- * 使用: npm install express ws sqlite3 jsonwebtoken bcryptjs cors axios
+ * Chat Server - 自建消息服务器
+ * 目标：对标Server酱体验
+ * 使用: npm install express ws sqlite3 jsonwebtoken bcryptjs cors
  * 运行: node server.js
  */
 
@@ -12,7 +13,6 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const path = require('path');
-const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
@@ -21,10 +21,6 @@ const wss = new WebSocket.Server({ server });
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'admin123';
-
-// Server酱³ Bot配置（用于发送图片消息）
-const SC3_BOT_TOKEN = process.env.SC3_BOT_TOKEN || '';
-const SC3_API_URL = process.env.SC3_API_URL || 'https://bot-go.apijia.cn';
 
 // 中间件
 app.use(cors());
@@ -74,7 +70,7 @@ db.serialize(() => {
   )`);
 });
 
-// WebSocket
+// WebSocket连接管理
 const clients = new Map();
 
 wss.on('connection', (ws, req) => {
@@ -126,23 +122,6 @@ function sendToUser(userId, message) {
     return true;
   }
   return false;
-}
-
-// 发送图片到Server酱³ Bot
-async function sendImageToSc3(chatId, imageUrl, caption) {
-  if (!SC3_BOT_TOKEN) return null;
-  
-  try {
-    const response = await axios.post(`${SC3_API_URL}/bot${SC3_BOT_TOKEN}/sendPhoto`, {
-      chat_id: chatId,
-      photo: imageUrl,
-      caption: caption || ''
-    });
-    return response.data;
-  } catch (e) {
-    console.error('Send image to SC3 failed:', e.message);
-    return null;
-  }
 }
 
 // ============ API ============
@@ -289,7 +268,7 @@ app.post('/api/messages/send', authenticateToken, (req, res) => {
 
   db.run('INSERT INTO messages (sender_id, receiver_id, content, type, image_url) VALUES (?, ?, ?, ?, ?)',
     [req.user.userId, receiver_id, content || '', msgType, image_url || null],
-    async function(err) {
+    function(err) {
       if (err) return res.json({ success: false, error: err.message });
 
       const message = {
@@ -303,18 +282,8 @@ app.post('/api/messages/send', authenticateToken, (req, res) => {
         created_at: new Date().toISOString()
       };
 
-      // 推送给接收者
+      // 推送消息给接收者
       sendToUser(receiver_id, { type: 'message', data: message });
-
-      // 如果配置了Server酱³ Bot且是图片消息，发送到Server酱
-      if (image_url && SC3_BOT_TOKEN) {
-        // 获取接收者的chat_id（这里简化处理，实际需要映射）
-        const user = await new Promise((resolve) => {
-          db.get('SELECT username FROM users WHERE id = ?', [receiver_id], (err, u) => resolve(u));
-        });
-        // 发送图片到Server酱
-        await sendImageToSc3(receiver_id, image_url, content);
-      }
 
       res.json({ success: true, message });
     }
@@ -334,7 +303,7 @@ app.get('/api/messages', authenticateToken, (req, res) => {
   });
 });
 
-// OpenClaw 集成
+// OpenClaw集成
 app.post('/api/openclaw/webhook', (req, res) => {
   const { user_id, content, image_url } = req.body;
   if (!user_id || (!content && !image_url)) return res.json({ success: false, error: 'Required' });

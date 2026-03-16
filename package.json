@@ -1,7 +1,7 @@
 {
   "name": "chat-server",
   "version": "1.0.0",
-  "description": "自建消息服务器",
+  "description": "自建消息服务器 - 对标Server酱体验",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -13,7 +13,6 @@
     "sqlite3": "^5.1.6",
     "jsonwebtoken": "^9.0.2",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "axios": "^1.6.0"
+    "cors": "^2.8.5"
   }
 }
